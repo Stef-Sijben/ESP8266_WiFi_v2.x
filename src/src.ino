@@ -45,6 +45,7 @@
 
 RapiSender rapiSender(&Serial);
 SoftwareSerial modbusSerial(13, 15); // RX, TX pin
+SDM sdm(modbusSerial, 9600, NOT_A_PIN);
 
 unsigned long Timer1; // Timer for events once every 30 seconds
 unsigned long Timer3; // Timer for events once every 2 seconds
@@ -88,7 +89,8 @@ void setup() {
   rapiSender.setOnEvent(on_rapi_event);
   rapiSender.enableSequenceId(0);
 
-  registerEnergyMeter(new SDMMeter(SDM630, modbusSerial, 9600, NOT_A_PIN));
+  sdm.begin();
+  registerEnergyMeter(new SDMMeter(sdm, SDM630, 1, "SDM630_evse"));
 } // end setup
 
 // -------------------------------------------------------------------

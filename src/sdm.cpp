@@ -1,5 +1,7 @@
 #include "sdm.h"
 
+#include "mqtt.h"
+
 EnergyMeter *energyMeters[MaxEnergyMeters];
 
 // Define mapping of generic fields to meter-specific registers
@@ -90,10 +92,43 @@ void registerEnergyMeter(EnergyMeter *meter) {
 }
 
 void updateEnergyMeters() {
-    for (size_t i = 0; i < MaxEnergyMeters; ++i) {
-        if (energyMeters[i] != nullptr) {
-            energyMeters[i]->update();
+    unsigned long startTime = millis();
+    for (size_t meterIndex = 0; meterIndex < MaxEnergyMeters; ++meterIndex) {
+        if (energyMeters[meterIndex] != nullptr) {
+            EnergyMeter &meter = *energyMeters[meterIndex];
+            if (meter.update()) {
+                String mqttData;
+                const String topic("energymeters/" + meter.name + '/');
+                for (int dataPointIndex = 0; dataPointIndex < NDataPointTypes; ++dataPointIndex) {
+                    const EnergyMeterDataPoint &dataPoint = meter.data(static_cast<DataPointType>(dataPointIndex));
+                    if (dataPoint.lastUpdated >= startTime) {
+                        mqttData += topic + DataPointTypeNames[dataPointIndex] + ':';
+                        for (int i = 0; i < 4; ++i) {
+                            mqttData += String(dataPoint.values[i]) + ' ';
+                        }
+                        mqttData[mqttData.length()-1] = ',';
+                    }
+                }
+                if (mqttData.length() > 0) {
+                    // Strip off the final ',' character
+                    mqttData.remove(mqttData.length() - 1);
+                    mqtt_publish(mqttData);
+                }
+            }
         }
+    }
+}
+
+const EnergyMeter *getEnergyMeter(size_t i) {
+    if (i < MaxEnergyMeters) {
+        return energyMeters[i];
+    }
+    return nullptr;
+}
+
+EnergyMeter::EnergyMeter(const String &name) : name(name) {
+    for (size_t i = 0; i < NDataPointTypes; ++i) {
+        dataPoints[i].type = static_cast<DataPointType>(i);
     }
 }
 
@@ -101,29 +136,35 @@ const EnergyMeterDataPoint &EnergyMeter::data(DataPointType fieldName) const {
     return dataPoints[fieldName];
 }
 
-SDMMeter::SDMMeter(SDMMeterType type, SoftwareSerial &serial, long baudRate, int derePin)
-        : type(type), dev(serial, baudRate, derePin) {
-    dev.begin();
+SDMMeter::SDMMeter(SDM &sdmDevice, SDMMeterType type, uint8_t addr, const String &name)
+    : EnergyMeter(name), dev(sdmDevice), type(type), modbusAddr(addr) {
 }
 
-void SDMMeter::update() {
+bool SDMMeter::update() {
+    bool updated = false;
+
     size_t updateField = nextUpdate;
     const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
 
     // TODO: request the actual data and update our values
     for (int i = 0; i < 4; ++i) {
-        unsigned short field = updateFields.registers[i];
+        unsigned short registerAddr = updateFields.registers[i];
 
-        if (field != EmptyDataPoint) {
-            dataPoints[updateField].values[i] = dev.readVal(field);
+        if (registerAddr != EmptyDataPoint) {
+            dataPoints[updateField].values[i] = dev.readVal(registerAddr, modbusAddr);
+            updated = true;
         }
         // TODO: Avoid duplicate requests for single-phase meters
     }
-    dataPoints[updateField].lastUpdated = millis();
+    if (updated) {
+        dataPoints[updateField].lastUpdated = millis();
+    }
 
     // Next iteration we go update the next field, but wrap around at the end
     if (++updateField >= NDataPointTypes) {
         updateField = 0;
     }
     nextUpdate = static_cast<DataPointType>(updateField);
+
+    return updated;
 }
