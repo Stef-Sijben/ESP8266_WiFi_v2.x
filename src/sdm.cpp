@@ -1,0 +1,129 @@
+#include "sdm.h"
+
+EnergyMeter *energyMeters[MaxEnergyMeters];
+
+// Define mapping of generic fields to meter-specific registers
+constexpr unsigned short EmptyDataPoint = 0xffff;
+struct SDMDataPointMapping {
+    const unsigned short registers[4];
+};
+
+constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes] = {
+    { // SDM120
+        { SDM120C_VOLTAGE,                 SDM120C_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM120C_CURRENT,                 SDM120C_CURRENT,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM120C_POWER,                   SDM120C_POWER,                   EmptyDataPoint, EmptyDataPoint },
+        { SDM120C_ACTIVE_APPARENT_POWER,   SDM120C_ACTIVE_APPARENT_POWER,   EmptyDataPoint, EmptyDataPoint },
+        { SDM120C_REACTIVE_APPARENT_POWER, SDM120C_REACTIVE_APPARENT_POWER, EmptyDataPoint, EmptyDataPoint },
+        { SDM120C_POWER_FACTOR,            SDM120C_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint }
+    },
+    { // SDM220
+        { SDM220T_VOLTAGE,                 SDM220T_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM220T_CURRENT,                 SDM220T_CURRENT,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM220T_POWER,                   SDM220T_POWER,                   EmptyDataPoint, EmptyDataPoint },
+        { SDM220T_ACTIVE_APPARENT_POWER,   SDM220T_ACTIVE_APPARENT_POWER,   EmptyDataPoint, EmptyDataPoint },
+        { SDM220T_REACTIVE_APPARENT_POWER, SDM220T_REACTIVE_APPARENT_POWER, EmptyDataPoint, EmptyDataPoint },
+        { SDM220T_POWER_FACTOR,            SDM220T_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint }
+    },
+    { // SDM630
+        { SDM630_VOLTAGE_AVERAGE,          SDM630_VOLTAGE1,            SDM630_VOLTAGE2,            SDM630_VOLTAGE3 },
+        { SDM630_CURRENTSUM,               SDM630_CURRENT1,            SDM630_CURRENT2,            SDM630_CURRENT3 },
+        { SDM630_POWERTOTAL,               SDM630_POWER1,              SDM630_POWER2,              SDM630_POWER3   },
+        { SDM630_VOLT_AMPS_TOTAL,          SDM630_VOLT_AMPS1,          SDM630_VOLT_AMPS2,          SDM630_VOLT_AMPS3 },
+        { SDM630_VOLT_AMPS_REACTIVE_TOTAL, SDM630_VOLT_AMPS_REACTIVE1, SDM630_VOLT_AMPS_REACTIVE2, SDM630_VOLT_AMPS_REACTIVE3 },
+        { SDM630_POWER_FACTOR_TOTAL,       SDM630_POWER_FACTOR1,       SDM630_POWER_FACTOR2,       SDM630_POWER_FACTOR3 }
+    }
+};
+
+float EnergyMeterDataPoint::sum() const {
+    float sum = 0.0;
+    for (int phase = 1; phase <= 3; ++ phase) {
+        if (!isnan(values[phase])) {
+            sum += values[phase];
+        }
+    }
+    return sum;
+}
+
+float EnergyMeterDataPoint::avg() const {
+    float sum = 0.0;
+    unsigned char count = 0;
+    for (int phase = 1; phase <= 3; ++ phase) {
+        if (!isnan(values[phase])) {
+            sum += values[phase];
+            ++count;
+        }
+    }
+    return sum / count;
+}
+
+float EnergyMeterDataPoint::min() const {
+    float m = INFINITY;
+    for (int phase = 1; phase <= 3; ++ phase) {
+        if (!isnan(values[phase]) && values[phase] < m) {
+            m = values[phase];
+        }
+    }
+    return m;
+}
+
+float EnergyMeterDataPoint::max() const {
+    float m = -INFINITY;
+    for (int phase = 1; phase <= 3; ++ phase) {
+        if (!isnan(values[phase]) && values[phase] > m) {
+            m = values[phase];
+        }
+    }
+    return m;
+}
+
+void registerEnergyMeter(EnergyMeter *meter) {
+    for (size_t i = 0; i < MaxEnergyMeters; ++i) {
+        if (energyMeters[i] == meter) {
+            return; // already registered
+        } else if (energyMeters[i] == nullptr) {
+            // Found an empty slot to register the new meter, save it and finish up
+            energyMeters[i] = meter;
+            return;
+        }
+    }
+}
+
+void updateEnergyMeters() {
+    for (size_t i = 0; i < MaxEnergyMeters; ++i) {
+        if (energyMeters[i] != nullptr) {
+            energyMeters[i]->update();
+        }
+    }
+}
+
+const EnergyMeterDataPoint &EnergyMeter::data(DataPointType fieldName) const {
+    return dataPoints[fieldName];
+}
+
+SDMMeter::SDMMeter(SDMMeterType type, SoftwareSerial &serial, long baudRate, int derePin)
+        : type(type), dev(serial, baudRate, derePin) {
+    dev.begin();
+}
+
+void SDMMeter::update() {
+    size_t updateField = nextUpdate;
+    const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
+
+    // TODO: request the actual data and update our values
+    for (int i = 0; i < 4; ++i) {
+        unsigned short field = updateFields.registers[i];
+
+        if (field != EmptyDataPoint) {
+            dataPoints[updateField].values[i] = dev.readVal(field);
+        }
+        // TODO: Avoid duplicate requests for single-phase meters
+    }
+    dataPoints[updateField].lastUpdated = millis();
+
+    // Next iteration we go update the next field, but wrap around at the end
+    if (++updateField >= NDataPointTypes) {
+        updateField = 0;
+    }
+    nextUpdate = static_cast<DataPointType>(updateField);
+}

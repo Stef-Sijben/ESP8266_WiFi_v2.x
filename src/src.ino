@@ -39,10 +39,12 @@
 #include "divert.h"
 #include "ota.h"
 #include "lcd.h"
+#include "sdm.h"
 
 #include "RapiSender.h"
 
 RapiSender rapiSender(&Serial);
+SoftwareSerial modbusSerial(13, 15); // RX, TX pin
 
 unsigned long Timer1; // Timer for events once every 30 seconds
 unsigned long Timer3; // Timer for events once every 2 seconds
@@ -85,6 +87,8 @@ void setup() {
 
   rapiSender.setOnEvent(on_rapi_event);
   rapiSender.enableSequenceId(0);
+
+  registerEnergyMeter(new SDMMeter(SDM630, modbusSerial, 9600, NOT_A_PIN));
 } // end setup
 
 // -------------------------------------------------------------------
@@ -147,6 +151,7 @@ loop() {
       }
     }
   }
+  updateEnergyMeters();
 
   if(wifi_client_connected())
   {
