@@ -1,5 +1,6 @@
 #include "sdm.h"
 
+#include "debug.h"
 #include "mqtt.h"
 
 EnergyMeter *energyMeters[MaxEnergyMeters];
@@ -82,21 +83,29 @@ float EnergyMeterDataPoint::max() const {
 void registerEnergyMeter(EnergyMeter *meter) {
     for (size_t i = 0; i < MaxEnergyMeters; ++i) {
         if (energyMeters[i] == meter) {
+            DBUGF("Energy meter %s already registered at index %d", meter->name.c_str(), i);
             return; // already registered
         } else if (energyMeters[i] == nullptr) {
             // Found an empty slot to register the new meter, save it and finish up
+            DBUGF("Registering energy meter %s at index %d", meter->name.c_str(), i);
             energyMeters[i] = meter;
             return;
         }
     }
+    DBUGF("Unable to register energy meter %s. No slots available", meter->name.c_str());
 }
 
 void updateEnergyMeters() {
+    DBUGLN("Updating energy meters");
+
     unsigned long startTime = millis();
     for (size_t meterIndex = 0; meterIndex < MaxEnergyMeters; ++meterIndex) {
         if (energyMeters[meterIndex] != nullptr) {
             EnergyMeter &meter = *energyMeters[meterIndex];
             if (meter.update()) {
+                DBUGF("Energy meter %s updated", meter.name.c_str());
+
+                // Collect a message with the updated values to publish via MQTT
                 String mqttData;
                 const String topic("energymeters/" + meter.name + '/');
                 for (int dataPointIndex = 0; dataPointIndex < NDataPointTypes; ++dataPointIndex) {
@@ -109,6 +118,7 @@ void updateEnergyMeters() {
                         mqttData[mqttData.length()-1] = ',';
                     }
                 }
+                DBUGF("MQTT data: %s", mqttData.c_str());
                 if (mqttData.length() > 0) {
                     // Strip off the final ',' character
                     mqttData.remove(mqttData.length() - 1);
@@ -137,13 +147,15 @@ const EnergyMeterDataPoint &EnergyMeter::data(DataPointType fieldName) const {
 }
 
 SDMMeter::SDMMeter(SDM &sdmDevice, SDMMeterType type, uint8_t addr, const String &name)
-    : EnergyMeter(name), dev(sdmDevice), type(type), modbusAddr(addr) {
+        : EnergyMeter(name), dev(sdmDevice), type(type), modbusAddr(addr) {
+    DBUGF("Created SDMMeter %s at addres %d", name.c_str(), addr);
 }
 
 bool SDMMeter::update() {
     bool updated = false;
 
     size_t updateField = nextUpdate;
+    DBUGF("SDMMeter: Updating field %s", DataPointTypeNames[updateField]);
     const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
 
     // TODO: request the actual data and update our values
@@ -152,6 +164,7 @@ bool SDMMeter::update() {
 
         if (registerAddr != EmptyDataPoint) {
             dataPoints[updateField].values[i] = dev.readVal(registerAddr, modbusAddr);
+            DBUGF("Read value %f from register %d", dataPoints[updateField].values[i], registerAddr);
             updated = true;
         }
         // TODO: Avoid duplicate requests for single-phase meters
