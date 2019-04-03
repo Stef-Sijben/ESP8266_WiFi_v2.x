@@ -161,22 +161,24 @@ bool SDMMeter::update() {
     bool updated = false;
 
     size_t updateField = nextUpdate;
-    DBUGF("SDMMeter: Updating field %s", DataPointTypeNames[updateField]);
+    DBUGF("SDMMeter %s@%d: Updating field %s", name.c_str(), modbusAddr, DataPointTypeNames[updateField]);
     const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
+    EnergyMeterDataPoint &dataPoint = dataPoints[updateField];
 
-    // TODO: request the actual data and update our values
+    if (millis() - dataPoint.lastUpdated >= 30000) {
         for (int i = 0; i < 4; ++i) {
             unsigned short registerAddr = updateFields.registers[i];
 
             if (registerAddr != EmptyDataPoint) {
-            dataPoints[updateField].values[i] = dev.readVal(registerAddr, modbusAddr);
-            DBUGF("Read value %f from register %d", dataPoints[updateField].values[i], registerAddr);
+                dataPoint.values[i] = dev.readVal(registerAddr, modbusAddr);
+                // DBUGF("Read value %f from register %d", dataPoint.values[i], registerAddr);
                 updated = true;
             }
             // TODO: Avoid duplicate requests for single-phase meters
         }
         if (updated) {
-        dataPoints[updateField].lastUpdated = millis();
+            dataPoint.lastUpdated = millis();
+        }
     }
 
     // Next iteration we go update the next field, but wrap around at the end
