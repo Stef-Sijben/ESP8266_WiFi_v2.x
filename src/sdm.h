@@ -15,6 +15,9 @@ enum DataPointType {
     POWER_REACTIVE,
     POWER_FACTOR,
 
+    // Several overall fields in one data point, no per-phase info
+    ENERGY,
+
     NDataPointTypes,
     TYPE_UNKNOWN
 };
@@ -25,7 +28,10 @@ constexpr const char *DataPointTypeNames[NDataPointTypes] = {
     "power_real",
     "power_apparent",
     "power_reactive",
-    "power_factor"
+    "power_factor",
+
+    // Several overall fields in one data point, no per-phase info
+    "energy"
 };
 
 // All the measurements of an energy meter for one type of measurement

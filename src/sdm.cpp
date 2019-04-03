@@ -18,7 +18,9 @@ constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes]
         { SDM120C_POWER,                   SDM120C_POWER,                   EmptyDataPoint, EmptyDataPoint },
         { SDM120C_ACTIVE_APPARENT_POWER,   SDM120C_ACTIVE_APPARENT_POWER,   EmptyDataPoint, EmptyDataPoint },
         { SDM120C_REACTIVE_APPARENT_POWER, SDM120C_REACTIVE_APPARENT_POWER, EmptyDataPoint, EmptyDataPoint },
-        { SDM120C_POWER_FACTOR,            SDM120C_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint }
+        { SDM120C_POWER_FACTOR,            SDM120C_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint },
+        // Several overall fields in one data point, no per-phase info
+        { SDM120C_IMPORT_ACTIVE_ENERGY,    SDM120C_EXPORT_ACTIVE_ENERGY,    EmptyDataPoint, EmptyDataPoint },
     },
     { // SDM220
         { SDM220T_VOLTAGE,                 SDM220T_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
@@ -26,15 +28,19 @@ constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes]
         { SDM220T_POWER,                   SDM220T_POWER,                   EmptyDataPoint, EmptyDataPoint },
         { SDM220T_ACTIVE_APPARENT_POWER,   SDM220T_ACTIVE_APPARENT_POWER,   EmptyDataPoint, EmptyDataPoint },
         { SDM220T_REACTIVE_APPARENT_POWER, SDM220T_REACTIVE_APPARENT_POWER, EmptyDataPoint, EmptyDataPoint },
-        { SDM220T_POWER_FACTOR,            SDM220T_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint }
+        { SDM220T_POWER_FACTOR,            SDM220T_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint },
+        // Several overall fields in one data point, no per-phase info
+        { SDM220T_IMPORT_ACTIVE_ENERGY,    SDM220T_EXPORT_ACTIVE_ENERGY,    SDM220T_IMPORT_REACTIVE_ENERGY, SDM220T_EXPORT_REACTIVE_ENERGY }
     },
     { // SDM630
-        { SDM630_VOLTAGE_AVERAGE,          SDM630_VOLTAGE1,            SDM630_VOLTAGE2,            SDM630_VOLTAGE3 },
-        { SDM630_CURRENTSUM,               SDM630_CURRENT1,            SDM630_CURRENT2,            SDM630_CURRENT3 },
-        { SDM630_POWERTOTAL,               SDM630_POWER1,              SDM630_POWER2,              SDM630_POWER3   },
-        { SDM630_VOLT_AMPS_TOTAL,          SDM630_VOLT_AMPS1,          SDM630_VOLT_AMPS2,          SDM630_VOLT_AMPS3 },
-        { SDM630_VOLT_AMPS_REACTIVE_TOTAL, SDM630_VOLT_AMPS_REACTIVE1, SDM630_VOLT_AMPS_REACTIVE2, SDM630_VOLT_AMPS_REACTIVE3 },
-        { SDM630_POWER_FACTOR_TOTAL,       SDM630_POWER_FACTOR1,       SDM630_POWER_FACTOR2,       SDM630_POWER_FACTOR3 }
+        { SDM630_VOLTAGE_AVERAGE,          SDM630_VOLTAGE1,             SDM630_VOLTAGE2,            SDM630_VOLTAGE3 },
+        { SDM630_CURRENTSUM,               SDM630_CURRENT1,             SDM630_CURRENT2,            SDM630_CURRENT3 },
+        { SDM630_POWERTOTAL,               SDM630_POWER1,               SDM630_POWER2,              SDM630_POWER3   },
+        { SDM630_VOLT_AMPS_TOTAL,          SDM630_VOLT_AMPS1,           SDM630_VOLT_AMPS2,          SDM630_VOLT_AMPS3 },
+        { SDM630_VOLT_AMPS_REACTIVE_TOTAL, SDM630_VOLT_AMPS_REACTIVE1,  SDM630_VOLT_AMPS_REACTIVE2, SDM630_VOLT_AMPS_REACTIVE3 },
+        { SDM630_POWER_FACTOR_TOTAL,       SDM630_POWER_FACTOR1,        SDM630_POWER_FACTOR2,       SDM630_POWER_FACTOR3 },
+        // Several overall fields in one data point, no per-phase info
+        { SDM630_IMPORT_ACTIVE_ENERGY,     SDM630_EXPORT_ACTIVE_ENERGY, SDM630_IMPORT_REACTIVE_ENERGY, SDM630_EXPORT_REACTIVE_ENERGY }
     }
 };
 
@@ -118,7 +124,7 @@ void updateEnergyMeters() {
                         mqttData[mqttData.length()-1] = ',';
                     }
                 }
-                DBUGF("MQTT data: %s", mqttData.c_str());
+                
                 if (mqttData.length() > 0) {
                     // Strip off the final ',' character
                     mqttData.remove(mqttData.length() - 1);
@@ -159,17 +165,17 @@ bool SDMMeter::update() {
     const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
 
     // TODO: request the actual data and update our values
-    for (int i = 0; i < 4; ++i) {
-        unsigned short registerAddr = updateFields.registers[i];
+        for (int i = 0; i < 4; ++i) {
+            unsigned short registerAddr = updateFields.registers[i];
 
-        if (registerAddr != EmptyDataPoint) {
+            if (registerAddr != EmptyDataPoint) {
             dataPoints[updateField].values[i] = dev.readVal(registerAddr, modbusAddr);
             DBUGF("Read value %f from register %d", dataPoints[updateField].values[i], registerAddr);
-            updated = true;
+                updated = true;
+            }
+            // TODO: Avoid duplicate requests for single-phase meters
         }
-        // TODO: Avoid duplicate requests for single-phase meters
-    }
-    if (updated) {
+        if (updated) {
         dataPoints[updateField].lastUpdated = millis();
     }
 
