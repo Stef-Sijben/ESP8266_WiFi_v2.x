@@ -44,7 +44,7 @@
 #include "RapiSender.h"
 
 RapiSender rapiSender(&Serial);
-SoftwareSerial modbusSerial(13, 15); // RX, TX pin
+SoftwareSerial modbusSerial(12, 14); // RX, TX pin
 SDM sdm(modbusSerial, 9600, NOT_A_PIN);
 
 unsigned long Timer1; // Timer for events once every 30 seconds
