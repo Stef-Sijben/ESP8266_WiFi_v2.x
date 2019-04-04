@@ -448,7 +448,14 @@ handleStatus(AsyncWebServerRequest *request) {
   s += "\"comm_sent\":" + String(comm_sent) + ",";
   s += "\"comm_success\":" + String(comm_success) + ",";
 
-  s += "\"amp\":" + String(amp) + ",";
+  const EnergyMeter *primaryMeter = getEnergyMeter(0);
+  long current = amp;
+  long totalEnergy = watthour_total;
+  if (primaryMeter != nullptr) {
+    current = 1000 * primaryMeter->data(CURRENT).max();
+    totalEnergy = 1000 * primaryMeter->data(ENERGY).values[0];
+  }
+  s += "\"amp\":" + String(current) + ",";
   s += "\"pilot\":" + String(pilot) + ",";
   s += "\"temp1\":" + String(temp1) + ",";
   s += "\"temp2\":" + String(temp2) + ",";
@@ -456,7 +463,7 @@ handleStatus(AsyncWebServerRequest *request) {
   s += "\"state\":" + String(state) + ",";
   s += "\"elapsed\":" + String(elapsed) + ",";
   s += "\"wattsec\":" + String(wattsec) + ",";
-  s += "\"watthour\":" + String(watthour_total) + ",";
+  s += "\"watthour\":" + String(totalEnergy) + ",";
 
   s += "\"gfcicount\":" + String(gfci_count) + ",";
   s += "\"nogndcount\":" + String(nognd_count) + ",";
