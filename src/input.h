@@ -2,6 +2,8 @@
 #define _EMONESP_INPUT_H
 
 #include <Arduino.h>
+
+#include "energymeter.h"
 #include "RapiSender.h"
 
 extern RapiSender rapiSender;
@@ -72,5 +74,21 @@ extern void update_rapi_values();
 extern void create_rapi_json();
 extern void on_rapi_event();
 
+class RapiMeter: public EnergyMeter {
+    friend void update_rapi_values();
+
+    // When was update last called? From millis()
+    unsigned long lastUpdate = 0;
+
+    // Allow a single field to be updated from update_rapi_values()
+    void setField(DataPointType field, unsigned char valueIndex, float value);
+    void setField(DataPointType field, float value);
+public:
+    RapiMeter(const String &name);
+
+    bool update() override;
+};
+
+extern RapiMeter rapiMeter;
 
 #endif // _EMONESP_INPUT_H

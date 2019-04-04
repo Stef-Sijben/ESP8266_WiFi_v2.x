@@ -84,6 +84,8 @@ long watthour_total = 0;
 unsigned long comm_sent = 0;
 unsigned long comm_success = 0;
 
+RapiMeter rapiMeter("OpenEVSE_RAPI");
+
 void
 create_rapi_json() {
   url = e_url;
@@ -210,6 +212,11 @@ update_rapi_values() {
           amp = strtol(val, NULL, 10);
           val = rapiSender.getToken(2);
           volt = strtol(val, NULL, 10);
+
+          // Convert mA -> A, mV -> V
+          rapiMeter.setField(CURRENT, amp / 1000.0f);
+          rapiMeter.setField(VOLTAGE, volt / 1000.0f);
+
           comm_success++;
         }
       }
@@ -240,6 +247,9 @@ update_rapi_values() {
           wattsec = strtol(val, NULL, 10);
           val = rapiSender.getToken(2);
           watthour_total = strtol(val, NULL, 10);
+          
+          // Set the entry for imported active energy only, convert Wh -> kWh
+          rapiMeter.setField(ENERGY, 0, watthour_total / 1000.0);
           comm_success++;
         }
       }
@@ -405,4 +415,32 @@ void on_rapi_event()
         break;
     }
   }
+}
+
+RapiMeter::RapiMeter(const String &name) : EnergyMeter(name) {
+}
+
+void RapiMeter::setField(DataPointType field, unsigned char valueIndex, float value) {
+  dataPoints[field].values[valueIndex] = value;
+  dataPoints[field].lastUpdated = millis();
+}
+void RapiMeter::setField(DataPointType field, float value) {
+  // Update both the aggregate and phase1 measurements
+  dataPoints[field].values[0] = value;
+  dataPoints[field].values[1] = value;
+  dataPoints[field].lastUpdated = millis();
+}
+
+bool RapiMeter::update() {
+  // No need to pull updates, they are pushed as they are read
+  // However, set the lastUpdated time for the recently updated fields
+  // This triggers MQTT message submission
+  for (unsigned int field = 0; field < NDataPointTypes; ++field) {
+    if ((long)(dataPoints[field].lastUpdated - lastUpdate) >= 0) {
+      dataPoints[field].lastUpdated = millis();
+    }
+  }
+
+  lastUpdate = millis() + 1;
+  return true;  
 }

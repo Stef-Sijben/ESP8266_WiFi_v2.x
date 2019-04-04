@@ -91,6 +91,7 @@ void setup() {
 
   sdm.begin();
   registerEnergyMeter(new SDMMeter(sdm, SDM630, 1, "SDM630_evse"));
+  registerEnergyMeter(&rapiMeter);
 } // end setup
 
 // -------------------------------------------------------------------
