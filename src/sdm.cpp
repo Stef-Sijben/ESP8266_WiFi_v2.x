@@ -59,7 +59,7 @@ SDMMeter::SDMMeter(SDM &sdmDevice, SDMMeterType type, uint8_t addr, const String
 bool SDMMeter::updateField(DataPointType field) {
     bool updated = false;
 
-    DBUGF("SDMMeter %s@%d: Updating field %s", name.c_str(), modbusAddr, DataPointTypeNames[updateField]);
+    DBUGF("SDMMeter %s@%d: Updating field %s", name.c_str(), modbusAddr, DataPointTypeNames[field]);
     const SDMDataPointMapping &updateFields = deviceRegisterMap[type][field];
     EnergyMeterDataPoint &dataPoint = dataPoints[field];
 

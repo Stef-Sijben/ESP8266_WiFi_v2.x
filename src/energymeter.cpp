@@ -78,18 +78,14 @@ void updateEnergyMeters() {
                 for (int dataPointIndex = 0; dataPointIndex < NDataPointTypes; ++dataPointIndex) {
                     const EnergyMeterDataPoint &dataPoint = meter.data(static_cast<DataPointType>(dataPointIndex));
                     if (dataPoint.lastUpdated >= startTime) {
-                        mqttData += topic + DataPointTypeNames[dataPointIndex] + ':';
+                        mqttData = topic + DataPointTypeNames[dataPointIndex] + ':';
                         for (int i = 0; i < 4; ++i) {
                             mqttData += String(dataPoint.values[i]) + ' ';
                         }
-                        mqttData[mqttData.length()-1] = ',';
+                        // Strip off the final ' ' character
+                        mqttData.remove(mqttData.length() - 1);
+                        mqtt_publish(mqttData);
                     }
-                }
-                
-                if (mqttData.length() > 0) {
-                    // Strip off the final ',' character
-                    mqttData.remove(mqttData.length() - 1);
-                    mqtt_publish(mqttData);
                 }
             }
         }
