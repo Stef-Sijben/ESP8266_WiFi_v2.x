@@ -1,9 +1,6 @@
 #include "sdm.h"
 
 #include "debug.h"
-#include "mqtt.h"
-
-EnergyMeter *energyMeters[MaxEnergyMeters];
 
 // Define mapping of generic fields to meter-specific registers
 constexpr unsigned short EmptyDataPoint = 0xffff;
@@ -44,126 +41,17 @@ constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes]
     }
 };
 
-float EnergyMeterDataPoint::sum() const {
-    float sum = 0.0;
-    for (int phase = 1; phase <= 3; ++ phase) {
-        if (!isnan(values[phase])) {
-            sum += values[phase];
-        }
-    }
-    return sum;
-}
-
-float EnergyMeterDataPoint::avg() const {
-    float sum = 0.0;
-    unsigned char count = 0;
-    for (int phase = 1; phase <= 3; ++ phase) {
-        if (!isnan(values[phase])) {
-            sum += values[phase];
-            ++count;
-        }
-    }
-    return sum / count;
-}
-
-float EnergyMeterDataPoint::min() const {
-    float m = INFINITY;
-    for (int phase = 1; phase <= 3; ++ phase) {
-        if (!isnan(values[phase]) && values[phase] < m) {
-            m = values[phase];
-        }
-    }
-    return m;
-}
-
-float EnergyMeterDataPoint::max() const {
-    float m = -INFINITY;
-    for (int phase = 1; phase <= 3; ++ phase) {
-        if (!isnan(values[phase]) && values[phase] > m) {
-            m = values[phase];
-        }
-    }
-    return m;
-}
-
-void registerEnergyMeter(EnergyMeter *meter) {
-    for (size_t i = 0; i < MaxEnergyMeters; ++i) {
-        if (energyMeters[i] == meter) {
-            DBUGF("Energy meter %s already registered at index %d", meter->name.c_str(), i);
-            return; // already registered
-        } else if (energyMeters[i] == nullptr) {
-            // Found an empty slot to register the new meter, save it and finish up
-            DBUGF("Registering energy meter %s at index %d", meter->name.c_str(), i);
-            energyMeters[i] = meter;
-            return;
-        }
-    }
-    DBUGF("Unable to register energy meter %s. No slots available", meter->name.c_str());
-}
-
-void updateEnergyMeters() {
-    DBUGLN("Updating energy meters");
-
-    unsigned long startTime = millis();
-    for (size_t meterIndex = 0; meterIndex < MaxEnergyMeters; ++meterIndex) {
-        if (energyMeters[meterIndex] != nullptr) {
-            EnergyMeter &meter = *energyMeters[meterIndex];
-            if (meter.update()) {
-                DBUGF("Energy meter %s updated", meter.name.c_str());
-
-                // Collect a message with the updated values to publish via MQTT
-                String mqttData;
-                const String topic("energymeters/" + meter.name + '/');
-                for (int dataPointIndex = 0; dataPointIndex < NDataPointTypes; ++dataPointIndex) {
-                    const EnergyMeterDataPoint &dataPoint = meter.data(static_cast<DataPointType>(dataPointIndex));
-                    if (dataPoint.lastUpdated >= startTime) {
-                        mqttData += topic + DataPointTypeNames[dataPointIndex] + ':';
-                        for (int i = 0; i < 4; ++i) {
-                            mqttData += String(dataPoint.values[i]) + ' ';
-                        }
-                        mqttData[mqttData.length()-1] = ',';
-                    }
-                }
-                
-                if (mqttData.length() > 0) {
-                    // Strip off the final ',' character
-                    mqttData.remove(mqttData.length() - 1);
-                    mqtt_publish(mqttData);
-                }
-            }
-        }
-    }
-}
-
-const EnergyMeter *getEnergyMeter(size_t i) {
-    if (i < MaxEnergyMeters) {
-        return energyMeters[i];
-    }
-    return nullptr;
-}
-
-EnergyMeter::EnergyMeter(const String &name) : name(name) {
-    for (size_t i = 0; i < NDataPointTypes; ++i) {
-        dataPoints[i].type = static_cast<DataPointType>(i);
-    }
-}
-
-const EnergyMeterDataPoint &EnergyMeter::data(DataPointType fieldName) const {
-    return dataPoints[fieldName];
-}
-
 SDMMeter::SDMMeter(SDM &sdmDevice, SDMMeterType type, uint8_t addr, const String &name)
         : EnergyMeter(name), dev(sdmDevice), type(type), modbusAddr(addr) {
     DBUGF("Created SDMMeter %s at addres %d", name.c_str(), addr);
 }
 
-bool SDMMeter::update() {
+bool SDMMeter::updateField(DataPointType field) {
     bool updated = false;
 
-    size_t updateField = nextUpdate;
     DBUGF("SDMMeter %s@%d: Updating field %s", name.c_str(), modbusAddr, DataPointTypeNames[updateField]);
-    const SDMDataPointMapping &updateFields = deviceRegisterMap[type][updateField];
-    EnergyMeterDataPoint &dataPoint = dataPoints[updateField];
+    const SDMDataPointMapping &updateFields = deviceRegisterMap[type][field];
+    EnergyMeterDataPoint &dataPoint = dataPoints[field];
 
     if (millis() - dataPoint.lastUpdated >= 30000) {
         for (int i = 0; i < 4; ++i) {
@@ -181,11 +69,14 @@ bool SDMMeter::update() {
         }
     }
 
-    // Next iteration we go update the next field, but wrap around at the end
-    if (++updateField >= NDataPointTypes) {
-        updateField = 0;
-    }
-    nextUpdate = static_cast<DataPointType>(updateField);
+    return updated;
+}
+
+bool SDMMeter::update() {
+    bool updated = updateField(nextUpdate);
+
+    // Next iteration we go update the next field, but wrap around after the last
+    nextUpdate = static_cast<DataPointType>((nextUpdate + 1) % NDataPointTypes);
 
     return updated;
 }
