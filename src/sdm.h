@@ -8,8 +8,9 @@
 #include <math.h>
 
 enum SDMMeterType {
-    SDM120,
-    SDM220,
+    SDM120C,
+    SDM220T,
+    SDM230,
     SDM630,
 
     NSDMMeterTypes

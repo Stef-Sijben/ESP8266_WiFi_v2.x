@@ -9,7 +9,7 @@ struct SDMDataPointMapping {
 };
 
 constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes] = {
-    { // SDM120
+    { // SDM120C
         { SDM120C_VOLTAGE,                 SDM120C_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
         { SDM120C_CURRENT,                 SDM120C_CURRENT,                 EmptyDataPoint, EmptyDataPoint },
         { SDM120C_POWER,                   SDM120C_POWER,                   EmptyDataPoint, EmptyDataPoint },
@@ -19,7 +19,7 @@ constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes]
         // Several overall fields in one data point, no per-phase info
         { SDM120C_IMPORT_ACTIVE_ENERGY,    SDM120C_EXPORT_ACTIVE_ENERGY,    EmptyDataPoint, EmptyDataPoint },
     },
-    { // SDM220
+    { // SDM220T
         { SDM220T_VOLTAGE,                 SDM220T_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
         { SDM220T_CURRENT,                 SDM220T_CURRENT,                 EmptyDataPoint, EmptyDataPoint },
         { SDM220T_POWER,                   SDM220T_POWER,                   EmptyDataPoint, EmptyDataPoint },
@@ -28,6 +28,16 @@ constexpr SDMDataPointMapping deviceRegisterMap[NSDMMeterTypes][NDataPointTypes]
         { SDM220T_POWER_FACTOR,            SDM220T_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint },
         // Several overall fields in one data point, no per-phase info
         { SDM220T_IMPORT_ACTIVE_ENERGY,    SDM220T_EXPORT_ACTIVE_ENERGY,    SDM220T_IMPORT_REACTIVE_ENERGY, SDM220T_EXPORT_REACTIVE_ENERGY }
+    },
+    { // SDM230
+        { SDM230_VOLTAGE,                 SDM230_VOLTAGE,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM230_CURRENT,                 SDM230_CURRENT,                 EmptyDataPoint, EmptyDataPoint },
+        { SDM230_POWER,                   SDM230_POWER,                   EmptyDataPoint, EmptyDataPoint },
+        { SDM230_ACTIVE_APPARENT_POWER,   SDM230_ACTIVE_APPARENT_POWER,   EmptyDataPoint, EmptyDataPoint },
+        { SDM230_REACTIVE_APPARENT_POWER, SDM230_REACTIVE_APPARENT_POWER, EmptyDataPoint, EmptyDataPoint },
+        { SDM230_POWER_FACTOR,            SDM230_POWER_FACTOR,            EmptyDataPoint, EmptyDataPoint },
+        // Several overall fields in one data point, no per-phase info
+        { SDM230_IMPORT_ACTIVE_ENERGY,    SDM230_EXPORT_ACTIVE_ENERGY,    SDM230_IMPORT_REACTIVE_ENERGY, SDM230_EXPORT_REACTIVE_ENERGY }
     },
     { // SDM630
         { SDM630_VOLTAGE_AVERAGE,          SDM630_VOLTAGE1,             SDM630_VOLTAGE2,            SDM630_VOLTAGE3 },
