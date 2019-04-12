@@ -168,7 +168,7 @@ loop() {
     if ((millis() - Timer1) >= 30000) {
       DBUGLN("Time1");
 
-      create_rapi_json(); // create JSON Strings for EmonCMS and MQTT
+      create_rapi_json(*getEnergyMeter(0)); // create JSON Strings for EmonCMS and MQTT
       if (config_emoncms_enabled()) {
         emoncms_publish(url);
       }

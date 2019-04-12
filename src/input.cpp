@@ -87,15 +87,17 @@ unsigned long comm_success = 0;
 RapiMeter rapiMeter("OpenEVSE_RAPI");
 
 void
-create_rapi_json() {
+create_rapi_json(const EnergyMeter &meter) {
   url = e_url;
   data = "";
   url += String(emoncms_node) + "&json={";
-  data += "\"amp\":" + String(amp) + ",";
-  if (volt > 0) {
-    data += "volt:" + String(volt) + ",";
-  }
-  data += "\"wh\":" + String(watthour_total) + ",";
+  data += "\"amp\":" + String(meter.data(CURRENT).sum()) + ",";
+  //if (volt > 0) {
+    data += "volt:" + String(meter.data(VOLTAGE).avg()) + ",";
+  //}
+  data += "\"wh\":" + String(meter.data(ENERGY).values[0]) + ",";
+  data += "\"kW\":" + String(meter.data(POWER_REAL).values[0]) + ",";
+  data += "\"kVAr\":" + String(meter.data(POWER_REACTIVE).values[0]) + ",";
   data += "\"temp1\":" + String(temp1) + ",";
   data += "\"temp2\":" + String(temp2) + ",";
   data += "\"temp3\":" + String(temp3) + ",";

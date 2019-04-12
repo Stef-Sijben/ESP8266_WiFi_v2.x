@@ -71,7 +71,7 @@ extern unsigned long comm_success;
 
 extern void handleRapiRead();
 extern void update_rapi_values();
-extern void create_rapi_json();
+extern void create_rapi_json(const EnergyMeter& meter);
 extern void on_rapi_event();
 
 class RapiMeter: public EnergyMeter {
