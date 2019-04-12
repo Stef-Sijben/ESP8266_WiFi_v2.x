@@ -55,6 +55,8 @@ struct EnergyMeterDataPoint {
 class EnergyMeter {
 public:
     const String name;
+    // The reading of the energy counter at the start of the last or current session
+    float sessionStartEnergy = NAN;
 
 protected:
     // All the readings from this meter
@@ -66,8 +68,15 @@ public:
 
     // Call this repeatedly to update the measurements.
     virtual bool update() = 0;
+
+    // This is called at the start of a new session.
+    // Use this for instance to update sessionStartEnergy.
+    virtual void startSession();
+    // Get the amount of energy consumed in the current session in kWh
+    virtual float sessionEnergy() const;
 };
 
+// In the setup function, register some meters.
 void registerEnergyMeter(EnergyMeter *meter);
 // Integrate this in the loop function to keep updating all meters' readings
 void updateEnergyMeters();

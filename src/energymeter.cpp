@@ -1,6 +1,7 @@
 #include "energymeter.h"
 
 #include "debug.h"
+#include "input.h"
 #include "mqtt.h"
 
 EnergyMeter *energyMeters[MaxEnergyMeters];
@@ -63,12 +64,23 @@ void registerEnergyMeter(EnergyMeter *meter) {
 }
 
 void updateEnergyMeters() {
+    // Keep track of the value of elapsed between calls to decide when a new session starts
+    static long lastElapsed = 0;
+    const bool newSession = elapsed < lastElapsed;
+    lastElapsed = elapsed;
+
     DBUGLN("Updating energy meters");
+    
 
     unsigned long startTime = millis();
     for (size_t meterIndex = 0; meterIndex < MaxEnergyMeters; ++meterIndex) {
         if (energyMeters[meterIndex] != nullptr) {
             EnergyMeter &meter = *energyMeters[meterIndex];
+            if (newSession) {
+                mqtt_publish("energymeters/" + meter.name + "/newsession:" + String(meter.sessionEnergy()));
+                meter.startSession();
+            }
+
             if (meter.update()) {
                 DBUGF("Energy meter %s updated", meter.name.c_str());
 
@@ -107,4 +119,16 @@ EnergyMeter::EnergyMeter(const String &name) : name(name) {
 
 const EnergyMeterDataPoint &EnergyMeter::data(DataPointType fieldName) const {
     return dataPoints[fieldName];
+}
+
+void EnergyMeter::startSession() {
+    sessionStartEnergy = dataPoints[ENERGY].values[0];
+}
+
+float EnergyMeter::sessionEnergy() const {
+    if (isnan(sessionStartEnergy)) {
+        // We don't know the count at session start, so return 0
+        return 0.0f;
+    }
+    return dataPoints[ENERGY].values[0] - sessionStartEnergy;
 }
