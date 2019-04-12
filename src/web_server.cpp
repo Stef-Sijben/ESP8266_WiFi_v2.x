@@ -451,9 +451,11 @@ handleStatus(AsyncWebServerRequest *request) {
   const EnergyMeter *primaryMeter = getEnergyMeter(0);
   long current = amp;
   long totalEnergy = watthour_total;
+  long sessionEnergy = wattsec;
   if (primaryMeter != nullptr) {
-    current = 1000 * primaryMeter->data(CURRENT).max();
-    totalEnergy = 1000 * primaryMeter->data(ENERGY).values[0];
+    current = 1000 * primaryMeter->data(CURRENT).max(); // A -> mA
+    totalEnergy = 1000 * primaryMeter->data(ENERGY).values[0]; // kWh -> Wh
+    sessionEnergy = primaryMeter->sessionEnergy() * 3600000; // kWh -> Ws
   }
   s += "\"amp\":" + String(current) + ",";
   s += "\"pilot\":" + String(pilot) + ",";
@@ -462,7 +464,7 @@ handleStatus(AsyncWebServerRequest *request) {
   s += "\"temp3\":" + String(temp3) + ",";
   s += "\"state\":" + String(state) + ",";
   s += "\"elapsed\":" + String(elapsed) + ",";
-  s += "\"wattsec\":" + String(wattsec) + ",";
+  s += "\"wattsec\":" + String(sessionEnergy) + ",";
   s += "\"watthour\":" + String(totalEnergy) + ",";
 
   s += "\"gfcicount\":" + String(gfci_count) + ",";
