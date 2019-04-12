@@ -68,9 +68,16 @@ bool SDMMeter::updateField(DataPointType field) {
             unsigned short registerAddr = updateFields.registers[i];
 
             if (registerAddr != EmptyDataPoint) {
-                dataPoint.values[i] = dev.readVal(registerAddr, modbusAddr);
-                // DBUGF("Read value %f from register %d", dataPoint.values[i], registerAddr);
-                updated = true;
+                float value = NAN;
+                // Try reading the value until we are successful
+                for (unsigned char attempt = 0; isnan(value) && attempt < 5; ++attempt) {
+                    value = dev.readVal(registerAddr, modbusAddr);
+                }
+                if (!isnan(value)) {
+                    dataPoint.values[i] = value;
+                    // DBUGF("Read value %f from register %d", dataPoint.values[i], registerAddr);
+                    updated = true;
+                }
             }
             // TODO: Avoid duplicate requests for single-phase meters
         }
